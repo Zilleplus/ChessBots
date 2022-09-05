@@ -23,7 +23,7 @@ def convert(board: chess.Board) -> np.ndarray:
 def get_database_dir() -> Path:
     return Path(__file__).parents[0]
 
-def load_database(num_games: int) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+def load_database(num_games: int, num_skip_games: int = 0) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     database_dir = get_database_dir()
     database_location =   Path(database_dir , "database.pgn")
 
@@ -36,10 +36,20 @@ def load_database(num_games: int) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     with open(database_location) as data:
         X: list[np.ndarray] = []
         Y: list[np.int8] = []
+        for i_game in range(num_skip_games):
+            if i_game%100000 == 0:
+                print(f"skipped till game i={i_game}")
+            try:
+                g = read_game(data)
+            except ValueError as e:
+                # Just ignore the errors, we can't recover them anyway.
+                continue
+
         for i_game in range(num_games):
             try:
                 g = read_game(data)
                 if g is None:
+                    print("No more games left")
                     break # end of the file
                 output_value: Dict[str, int] = {'1/2-1/2':0, '0-1':-1, '1-0':1}
 
