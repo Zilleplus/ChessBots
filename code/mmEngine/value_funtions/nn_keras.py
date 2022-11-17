@@ -9,6 +9,8 @@ import numpy as np
 from typing import Optional
 from pathlib import Path
 from mmEngine.database import convert
+import wandb
+from wandb.keras import WandbCallback
 
 
 def LoadModel(file_location: Path):
@@ -120,6 +122,9 @@ def TrainModel(model: keras.Model,
 
     if log_dir_board is not None:
         callbacks.append(keras.callbacks.TensorBoard(log_dir=log_dir_board))
+
+    wandb.init(config={"hyper": "parameter"})
+    callbacks.append(WandbCallback())
 
     class GradCallback(keras.callbacks.Callback):
         model: keras.Model
