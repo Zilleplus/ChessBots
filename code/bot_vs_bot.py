@@ -1,19 +1,22 @@
+import chess
 from random import Random
 from time import sleep
-import chess
-import numpy as np
-import chess.svg
+from mmEngine.value_funtions.value_function import value_function_path
+from mmEngine.value_funtions.nn_pytorch import load_model
+from mmEngine.value_funtions import MaterialCount, NNPytorchValueFunction
 from mmEngine.agents import RandomAgent, MinMaxAgent, MinMaxAlphaBetaAgent, Agent
-from mmEngine.value_funtions import NNKerasValueFunction
-from mmEngine.value_funtions import MaterialCount
-from pathlib import Path
+
 
 def main():
     board = chess.Board()
-    nn_location = Path("./trial_network.keras")
 
     print("game started... ")
-    bot_white = MinMaxAlphaBetaAgent(NNKerasValueFunction(nn_location))
+    torch_function = "nn.torch"
+    model_path = value_function_path(name=torch_function)
+    bot_white = MinMaxAlphaBetaAgent(
+        evaluation_function=NNPytorchValueFunction(model=load_model(model_path)),
+        depth=3,
+    )
     bot_black = RandomAgent()
     for i in range(40):
         if board.is_game_over():
@@ -44,5 +47,5 @@ def main():
             print(f"The winner is: {winner}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

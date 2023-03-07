@@ -2,7 +2,7 @@ from multiprocessing import get_context
 from typing import Any, Awaitable, Optional
 import chess
 from mmEngine.agents import Agent, RandomAgent, MinMaxAgent, MinMaxAlphaBetaAgent
-from mmEngine.value_funtions import MaterialCount, NNKerasValueFunction, ValueFunctionMaterial
+from mmEngine.value_funtions import MaterialCount, NNPytorchValueFunction, ValueFunctionMaterial
 from dataclasses import dataclass
 
 import asyncio
@@ -10,6 +10,9 @@ from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 from pathlib import Path
+from mmEngine.value_funtions.nn_pytorch import load_model
+
+from mmEngine.value_funtions.value_function import value_function_path
 
 @dataclass
 class Result:
@@ -73,12 +76,9 @@ async def simulate_games(agent1_factory, agent2_factory, num_games: int=10) -> l
 
 
 def main() -> None:
-    # At the moment tensorflow can't seem to allocate the memory in multiprocesssing,
-    # use the simulate_serial instead...
-    nn_location = Path("./trial_network.keras")
-    # nnEvalFunc = NNKerasValueFunction(nn_location)
-
-    fac1 = lambda: MinMaxAlphaBetaAgent(evaluation_function=ValueFunctionMaterial(), depth=3)
+    torch_function = "nn.torch"
+    model_path = value_function_path(name=torch_function)
+    fac1 = lambda: MinMaxAlphaBetaAgent(evaluation_function=NNPytorchValueFunction(model=load_model(model_path)), depth=3)
     fac2 = lambda: RandomAgent()
     results = asyncio.run(simulate_games(fac1, fac2,num_games=20))
 

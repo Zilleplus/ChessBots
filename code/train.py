@@ -1,30 +1,23 @@
-from mmEngine.value_funtions import CreateModel, TrainModel, LoadModel
+from mmEngine.value_funtions import TrainPytorchModel, value_function_path
 from mmEngine.database import get_database_dir
 from pathlib import Path
 import numpy as np
 
-
-def main():
+def get_data() -> list[np.ndarray]:
     database_dir = get_database_dir()
     data = []
     for i in range(6):
         processed_database_path = Path(
             database_dir, f"database_processed{i}.npz")
-        if processed_database_path.exists:
+        if processed_database_path.exists():
             data.append(np.load(processed_database_path))
 
-    network_file_path = Path("./trial_network.keras")
+    return data
 
-    if not network_file_path.exists():
-        print(f"{network_file_path} does not exist, creating new model...")
-        model = CreateModel()
-    else:
-        print(f"Loading model at {network_file_path}...")
-        model = LoadModel(network_file_path)
-
-    print("Training model...")
-    TrainModel(model, data, save_path=network_file_path)
-
+def main_pytorch():
+    data = get_data()
+    network_file_path = value_function_path(name="nn.torch")
+    TrainPytorchModel(data, model_path=network_file_path)
 
 if __name__ == "__main__":
-    main()
+    main_pytorch()
