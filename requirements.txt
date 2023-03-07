@@ -1,0 +1,9 @@
+chess==1.9.4
+torch==1.13.1
+typing_extensions==4.5.0
+mypy
+python-lsp-server
+pylsp-mypy
+numpy
+matplotlib
+wandb

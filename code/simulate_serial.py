@@ -1,8 +1,9 @@
-from typing import Awaitable, Optional
+from typing import Optional
 import chess
 from mmEngine.agents import Agent, RandomAgent, MinMaxAgent
 from mmEngine.agents.minMaxAlphaBetaSearch import MinMaxAlphaBetaAgent
-from mmEngine.value_funtions import MaterialCount, NNKerasValueFunction
+from mmEngine.value_funtions import MaterialCount, value_function_path
+from mmEngine.value_funtions.nn_pytorch import NNPytorchValueFunction, load_model
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -71,8 +72,9 @@ def simulate_games(agent1_factory, agent2_factory, num_games: int=10) -> list[Re
 
 
 def main() -> None:
-    path_nn = Path("./trial_network.keras")
-    fac1 = lambda: MinMaxAlphaBetaAgent(evaluation_function=NNKerasValueFunction(keras_model_location=path_nn), depth=3)
+    torch_function = "nn.torch"
+    model_path = value_function_path(name=torch_function)
+    fac1 = lambda: MinMaxAlphaBetaAgent(evaluation_function=NNPytorchValueFunction(model=load_model(model_path)), depth=3)
     fac2 = lambda: RandomAgent()
     results = simulate_games(fac1, fac2,num_games=4)
 

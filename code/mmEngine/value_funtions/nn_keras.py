@@ -17,7 +17,6 @@ def LoadModel(file_location: Path):
     assert file_location.exists()
     return keras.models.load_model(file_location)
 
-
 def CreateModel() -> keras.Model:
     # 8*8 board -> one hot encoding of 12 states
     model = keras.Sequential([
@@ -116,7 +115,7 @@ def TrainModel(model: keras.Model,
         print(f"Adding save callback to location: {save_path}")
         callback_save = keras.callbacks.ModelCheckpoint(
             filepath=save_path,
-            minotor="val_loss",
+            monitor="val_loss",
             save_best_only=True)
         callbacks.append(callback_save)
 
