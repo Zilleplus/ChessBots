@@ -1,7 +1,5 @@
 import chess
-from random import Random
-from time import sleep
-from mmEngine.value_funtions.value_function import value_function_path
+from mmEngine.models.store import model_store
 from mmEngine.value_funtions.nn_pytorch import load_model
 from mmEngine.value_funtions import MaterialCount, NNPytorchValueFunction
 from mmEngine.agents import RandomAgent, MinMaxAgent, MinMaxAlphaBetaAgent, Agent
@@ -9,12 +7,11 @@ from mmEngine.agents import RandomAgent, MinMaxAgent, MinMaxAlphaBetaAgent, Agen
 
 def main():
     board = chess.Board()
+    model_path, model = model_store()["BigCNN"]
 
     print("game started... ")
-    torch_function = "nn.torch"
-    model_path = value_function_path(name=torch_function)
     bot_white = MinMaxAlphaBetaAgent(
-        evaluation_function=NNPytorchValueFunction(model=load_model(model_path)),
+        evaluation_function=NNPytorchValueFunction(model=load_model(model_path, model)),
         depth=3,
     )
     bot_black = RandomAgent()
