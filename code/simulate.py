@@ -1,18 +1,21 @@
-from multiprocessing import get_context
-from typing import Any, Awaitable, Optional
-import chess
-from mmEngine.agents import Agent, RandomAgent, MinMaxAgent, MinMaxAlphaBetaAgent
-from mmEngine.value_funtions import MaterialCount, NNPytorchValueFunction, ValueFunctionMaterial
-from dataclasses import dataclass
-
 import asyncio
-from functools import partial
 from concurrent.futures import ProcessPoolExecutor
-import numpy as np
+from dataclasses import dataclass
+from functools import partial
+from multiprocessing import get_context
 from pathlib import Path
+from typing import Any, Awaitable, Optional
+
+import chess
+import numpy as np
+
+from mmEngine.agents import (Agent, MinMaxAgent, MinMaxAlphaBetaAgent,
+                             RandomAgent)
+from mmEngine.models.store import model_store
+from mmEngine.value_funtions import (MaterialCount, NNPytorchValueFunction,
+                                     ValueFunctionMaterial)
 from mmEngine.value_funtions.nn_pytorch import load_model
 
-from mmEngine.value_funtions.value_function import value_function_path
 
 @dataclass
 class Result:
@@ -20,6 +23,7 @@ class Result:
     score_black: int
     error: Optional[str]
     winner: Optional[bool]
+
 
 def simulate(agent1: Agent, agent2: Agent, seed: int, num_moves: int = 50):
     np.random.seed(seed)
@@ -42,7 +46,6 @@ def simulate(agent1: Agent, agent2: Agent, seed: int, num_moves: int = 50):
             break
         b.push(m2)
 
-
     (white_score, black_score) = MaterialCount(b)
 
     winner: Optional[bool] = None
@@ -51,39 +54,53 @@ def simulate(agent1: Agent, agent2: Agent, seed: int, num_moves: int = 50):
         winner = outcome.winner
     return Result(white_score, black_score, error, winner)
 
-async def simulate_games(agent1_factory, agent2_factory, num_games: int=10) -> list[Result]:
-    context = get_context('spawn')
+
+async def simulate_games(
+    agent1_factory, agent2_factory, num_games: int = 10
+) -> list[Result]:
+    context = get_context("spawn")
     with ProcessPoolExecutor(mp_context=context) as process_pool:
         loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
-        sims = [partial(simulate, agent1_factory(), agent2_factory(), seed=i) for i in range(num_games)]
+        sims = [
+            partial(simulate, agent1_factory(), agent2_factory(), seed=i)
+            for i in range(num_games)
+        ]
 
-        coros: list[Awaitable[Result]] = [loop.run_in_executor(process_pool, call) for call in sims]
+        coros: list[Awaitable[Result]] = [
+            loop.run_in_executor(process_pool, call) for call in sims
+        ]
         results: list[Result] = await asyncio.gather(*coros)
 
-
-        avg_white_score = sum([x.score_white for x in results])/len(results)
+        avg_white_score = sum([x.score_white for x in results]) / len(results)
         print(f"average white score={avg_white_score}")
-        avg_black_score = sum([x.score_black for x in results])/len(results)
+        avg_black_score = sum([x.score_black for x in results]) / len(results)
         print(f"average black score={avg_black_score}")
 
-        white_wins: int = sum([1 if x.winner is not None and x.winner else 0 for x in results])
+        white_wins: int = sum(
+            [1 if x.winner is not None and x.winner else 0 for x in results]
+        )
         print(f"white has {white_wins} wins")
 
-        black_wins: int = sum([1 if x.winner is not None and not x.winner else 0 for x in results])
+        black_wins: int = sum(
+            [1 if x.winner is not None and not x.winner else 0 for x in results]
+        )
         print(f"black has {black_wins} wins")
 
         return results
 
 
 def main() -> None:
-    torch_function = "nn.torch"
-    model_path = value_function_path(name=torch_function)
-    fac1 = lambda: MinMaxAlphaBetaAgent(evaluation_function=NNPytorchValueFunction(model=load_model(model_path)), depth=3)
+    model_path, model = model_store()["BigCNN"]
+    fac1 = lambda: MinMaxAlphaBetaAgent(
+        evaluation_function=NNPytorchValueFunction(model=load_model(model_path, model)),
+        depth=3,
+    )
     fac2 = lambda: RandomAgent()
-    results = asyncio.run(simulate_games(fac1, fac2,num_games=20))
+    results = asyncio.run(simulate_games(fac1, fac2, num_games=20))
 
     for r in results:
         print(r)
+
 
 if __name__ == "__main__":
     main()

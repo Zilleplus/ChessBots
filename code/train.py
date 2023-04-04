@@ -1,7 +1,12 @@
-from mmEngine.value_funtions import TrainPytorchModel, value_function_path
-from mmEngine.database import get_database_dir
 from pathlib import Path
+
 import numpy as np
+
+from mmEngine.database import get_database_dir
+from mmEngine.models import load_model
+from mmEngine.models.store import model_store
+from mmEngine.value_funtions import TrainPytorchModel
+
 
 def get_data() -> list[np.ndarray]:
     database_dir = get_database_dir()
@@ -16,8 +21,15 @@ def get_data() -> list[np.ndarray]:
 
 def main_pytorch():
     data = get_data()
-    network_file_path = value_function_path(name="nn.torch")
-    TrainPytorchModel(data, model_path=network_file_path)
+    model_path, model = model_store()["BigCNN"]
+    if model_path.exists:
+        print(f"Loading existing model at {model_path} \n")
+        model = load_model(model_path, model)
+        model = load_model(model_path, model).cuda()
+    else:
+        print(f"Created new model, no model found at {model_path} \n")
+
+    TrainPytorchModel(data, model=model.cuda())
 
 if __name__ == "__main__":
     main_pytorch()

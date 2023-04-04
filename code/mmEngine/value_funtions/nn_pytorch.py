@@ -10,122 +10,10 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 import numpy as np
 import wandb
 from mmEngine.database import convert
-
-from mmEngine.value_funtions.value_function import ValueFunction, value_function_path
-
-
-def save_model(
-    model: nn.Module, optimizer: optim.Optimizer, loss: float, model_path: Path
-):
-    torch.save(
-        {
-            "title": "pytorch chess model",
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "loss": loss,
-        },
-        model_path,
-    )
-
-
-def load_model(model_path: Path) -> nn.Module:
-    """
-    Load a model from a path.
-    
-    Args:
-        model_path (Path): Path to the model.
-    return:
-        nn.Module: The loaded model.
-    """
-    checkpoint = torch.load(model_path)
-    model = ChessModel()
-    model.load_state_dict(checkpoint["model_state_dict"])
-    return model
-
-
-class ChessModel(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        # 8*8 board: big kernels -> only few channels
-        # start with 13 channels
-        # 6 white pieces, 6 black pieces, and no piece = 13
-        self.conv1_8_8 = nn.Conv2d(
-            in_channels=13, out_channels=13, kernel_size=1, padding="same"
-        )
-        self.dropout1_8_8 = nn.Dropout2d(0.5)
-        self.conv2_8_8 = nn.Conv2d(
-            in_channels=13, out_channels=16, kernel_size=3, padding="same"
-        )
-        self.dropout2_8_8 = nn.Dropout2d(0.5)
-        self.conv3_8_8 = nn.Conv2d(
-            in_channels=16, out_channels=32, kernel_size=5, padding="same"
-        )
-
-        # If we want same padding -> https://discuss.pytorch.org/t/same-padding-equivalent-in-pytorch/85121
-        # Doesn't seem a problem here as the size fits at the moment.
-        self.max_pool1 = nn.MaxPool2d(kernel_size=(2, 2))
-
-        # 4*4 boards
-        self.conv1_4_4 = nn.Conv2d(
-            in_channels=32, out_channels=64, kernel_size=2, padding="same"
-        )
-        self.dropout1_4_4 = nn.Dropout2d(0.5)
-        self.conv2_4_4 = nn.Conv2d(
-            in_channels=64, out_channels=64, kernel_size=2, padding="same"
-        )
-        self.dropout2_4_4 = nn.Dropout2d(0.5)
-        self.conv3_4_4 = nn.Conv2d(
-            in_channels=64, out_channels=128, kernel_size=2, padding="same"
-        )
-
-        self.max_pool2 = nn.MaxPool2d(kernel_size=(2, 2))
-
-        # 2*2 boards
-        # this seems serious overkill, I need to plot the response of these things check if
-        # they end up producing useful patterns.
-        self.conv1_2_2 = nn.Conv2d(
-            in_channels=128, out_channels=128, kernel_size=1, padding="same"
-        )
-        self.dropout1_2_2 = nn.Dropout2d(0.5)
-        self.conv2_2_2 = nn.Conv2d(
-            in_channels=128, out_channels=128, kernel_size=1, padding="same"
-        )
-        self.dropout2_2_2 = nn.Dropout2d(0.5)
-        self.conv3_2_2 = nn.Conv2d(
-            in_channels=128, out_channels=128, kernel_size=1, padding="same"
-        )
-
-        # 2*2 image * 128 channels = 4*128=512
-        self.output = nn.Linear(in_features=512, out_features=1)
-
-    def forward(self, x):
-        x = F.relu(self.conv1_8_8(x))
-        x = self.dropout1_8_8(x)
-        x = F.relu(self.conv2_8_8(x))
-        x = self.dropout2_8_8(x)
-        x = F.relu(self.conv3_8_8(x))
-
-        x = self.max_pool1(x)
-
-        x = F.relu(self.conv1_4_4(x))
-        x = self.dropout1_4_4(x)
-        x = F.relu(self.conv2_4_4(x))
-        x = self.dropout2_4_4(x)
-        x = F.relu(self.conv3_4_4(x))
-
-        x = self.max_pool2(x)
-
-        x = F.relu(self.conv1_2_2(x))
-        x = self.dropout1_2_2(x)
-        x = F.relu(self.conv2_2_2(x))
-        x = self.dropout2_2_2(x)
-        x = F.relu(self.conv3_2_2(x))
-
-        x = torch.flatten(x, start_dim=1)
-        x = self.output(x)
-
-        return x
-
+from mmEngine.models import load_model, save_model
+from mmEngine.models.big_cnn import BigCNN
+from mmEngine.models.store import model_store
+from mmEngine.value_funtions.value_function import ValueFunction
 
 def encode_board(board_positions: torch.Tensor) -> torch.Tensor:
     """
@@ -153,9 +41,8 @@ def encode_board(board_positions: torch.Tensor) -> torch.Tensor:
 
 def TrainPytorchModel(
     numpy_dataset: list[np.ndarray],
-    model_path: Optional[Path] = None,
+    model: nn.Module,
     disable_save=False,
-    disable_load=False,
     disable_wandb=False,
 ):
     """
@@ -163,9 +50,8 @@ def TrainPytorchModel(
 
     args:
         numpy_dataset: a list of numpy arrays containing the dataset.
-        model_path: the path to the model to load.
+        model: the model to train.
         disable_save: if true, don't save the model.
-        disable_load: if true, don't load the model, but always train from scratch.
         disable_wandb: if true, don't log to wandb.
 
     returns:
@@ -187,12 +73,6 @@ def TrainPytorchModel(
     train_set, val_set, test_set = random_split(
         dataset, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(42)
     )
-
-    model: nn.Module = ChessModel().cuda()
-    if model_path is not None and not disable_load:
-        print(f"Loading existing model at {model_path} \n")
-        model = load_model(model_path).cuda()
-        print(f"Successfully loaded model at {model_path} \n")
 
     if not disable_wandb:
         wandb.init(project="chess_pytorch")
@@ -252,14 +132,16 @@ def TrainPytorchModel(
             wandb.log({"loss": running_loss})
             wandb.log({"val_loss": val_loss})
 
-        if model_path is not None and not disable_save:
-            print(f"-> saving model to {model_path}.")
-            save_model(
-                model=model,
-                model_path=model_path,
-                loss=running_loss,
-                optimizer=optimizer,
-            )
+        
+        model_path, save_sucess = save_model(
+            model=model,
+            loss=running_loss,
+            optimizer=optimizer,
+        )
+        if save_sucess:
+            print(f"-> saved model to {model_path}.")
+        else:
+            print(f"-> failed to save model to {model_path}.")
 
     model.eval()
     test_loss: float = 0.0
