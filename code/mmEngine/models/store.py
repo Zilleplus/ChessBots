@@ -1,5 +1,6 @@
 from pathlib import Path
-from mmEngine.models.big_cnn import BigCNN
+from .big_cnn import BigCNN
+from .small_cnn import SmallCNN
 from typing import Tuple, cast
 from torch import nn
 
@@ -14,9 +15,18 @@ def model_store() -> dict[str, Tuple[Path, nn.Module]]:
     Models that are available to be loaded.
 
     returns:
-        A dictionary of models, the key is the name of the model, 
+        A dictionary of models, the key is the name of the model,
         the value is a tuple of the path to the model and an instance of the model.
     """
-    models = {BigCNN.__name__: (torch_file_location(name=BigCNN.__name__ + ".torch"), cast(nn.Module, BigCNN()))}
+    models = {
+        SmallCNN.__name__: (
+            torch_file_location(name=SmallCNN.__name__ + ".torch"),
+            cast(nn.Module, SmallCNN()),
+        ),
+        BigCNN.__name__: (
+            torch_file_location(name=BigCNN.__name__ + ".torch"),
+            cast(nn.Module, BigCNN()),
+        ),
+    }
 
     return models

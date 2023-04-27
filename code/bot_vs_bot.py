@@ -1,6 +1,6 @@
 import chess
+from mmEngine.models import load_model
 from mmEngine.models.store import model_store
-from mmEngine.value_funtions.nn_pytorch import load_model
 from mmEngine.value_funtions import MaterialCount, NNPytorchValueFunction
 from mmEngine.agents import RandomAgent, MinMaxAgent, MinMaxAlphaBetaAgent, Agent
 

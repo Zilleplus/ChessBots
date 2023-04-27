@@ -3,18 +3,19 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 from multiprocessing import get_context
-from pathlib import Path
-from typing import Any, Awaitable, Optional
+from typing import Awaitable, Optional
 
 import chess
 import numpy as np
 
-from mmEngine.agents import (Agent, MinMaxAgent, MinMaxAlphaBetaAgent,
-                             RandomAgent)
+from mmEngine.agents import Agent, MinMaxAgent, MinMaxAlphaBetaAgent, RandomAgent
+from mmEngine.models import load_model
 from mmEngine.models.store import model_store
-from mmEngine.value_funtions import (MaterialCount, NNPytorchValueFunction,
-                                     ValueFunctionMaterial)
-from mmEngine.value_funtions.nn_pytorch import load_model
+from mmEngine.value_funtions import (
+    MaterialCount,
+    NNPytorchValueFunction,
+    ValueFunctionMaterial,
+)
 
 
 @dataclass

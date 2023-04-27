@@ -1,1 +1,1 @@
-from .load_database import load_database, get_database_dir, convert
+from .load_database import load_database, get_database_dir, convert, encoding_channels

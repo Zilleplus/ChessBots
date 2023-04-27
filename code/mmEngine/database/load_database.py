@@ -5,11 +5,12 @@ from chess.pgn import read_game, read_headers
 import numpy as np
 import chess
 
+
 def convert(board: chess.Board) -> np.ndarray:
     # we have 8*8=64 squares(so 64 times a byte)
-    x: np.ndarray = np.zeros(8*8, np.uint8)
+    x: np.ndarray = np.zeros(8 * 8, np.uint8)
 
-    for i in range(8*8):
+    for i in range(8 * 8):
         # 6 different pieces
         # 0 if no piece
         # 1..6 : white
@@ -27,12 +28,32 @@ def convert(board: chess.Board) -> np.ndarray:
 
     return x
 
+
+encoding_channels = {
+    'white pawn': 0,
+    "white knight": 1,
+    "white bishop": 2,
+    "white rook": 3,
+    "white queen": 4,
+    "white king": 5,
+    "black pawn": 6,
+    "black knight": 7,
+    "black bishop": 8,
+    "black rook": 9,
+    "black queen": 10,
+    "black king": 11,
+}
+
+
 def get_database_dir() -> Path:
     return Path(__file__).parent.parent.parent.parent / "data"
 
-def load_database(num_games: int, num_skip_games: int = 0) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+
+def load_database(
+    num_games: int, num_skip_games: int = 0
+) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     database_dir = get_database_dir()
-    database_location: Path =   database_dir / "database.pgn"
+    database_location: Path = database_dir / "database.pgn"
 
     if not exists(database_location):
         print(f"cant find database at {database_location}")
@@ -44,7 +65,7 @@ def load_database(num_games: int, num_skip_games: int = 0) -> Optional[Tuple[np.
         X: list[np.ndarray] = []
         Y: list[np.int8] = []
         for i_game in range(num_skip_games):
-            if i_game%100000 == 0:
+            if i_game % 100000 == 0:
                 print(f"skipped till game i={i_game}")
             try:
                 g = read_game(data)
@@ -57,12 +78,14 @@ def load_database(num_games: int, num_skip_games: int = 0) -> Optional[Tuple[np.
                 g = read_game(data)
                 if g is None:
                     print("No more games left")
-                    break # end of the file
-                output_value: Dict[str, int] = {'1/2-1/2':0, '0-1':-1, '1-0':1}
+                    break  # end of the file
+                output_value: Dict[str, int] = {"1/2-1/2": 0, "0-1": -1, "1-0": 1}
 
                 result: str = g.headers["Result"]
                 if result not in output_value:
-                    print(f"unkown result on game i={i_game} with headers[\"Results\"]={result}")
+                    print(
+                        f'unknown result on game i={i_game} with headers["Results"]={result}'
+                    )
                     continue
 
                 y = np.int8(output_value[result])
@@ -75,5 +98,5 @@ def load_database(num_games: int, num_skip_games: int = 0) -> Optional[Tuple[np.
                     Y.append(y)
             except:
                 print(f"error on game i={i_game}")
-        
+
         return (np.array(X), np.array(Y))

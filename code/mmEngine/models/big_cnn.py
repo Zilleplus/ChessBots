@@ -11,11 +11,11 @@ class BigCNN(nn.Module):
         # start with 13 channels
         # 6 white pieces, 6 black pieces, and no piece = 13
         self.conv1_8_8 = nn.Conv2d(
-            in_channels=13, out_channels=13, kernel_size=1, padding="same"
+            in_channels=12, out_channels=12, kernel_size=1, padding="same"
         )
         self.dropout1_8_8 = nn.Dropout2d(0.5)
         self.conv2_8_8 = nn.Conv2d(
-            in_channels=13, out_channels=16, kernel_size=3, padding="same"
+            in_channels=12, out_channels=16, kernel_size=3, padding="same"
         )
         self.dropout2_8_8 = nn.Dropout2d(0.5)
         self.conv3_8_8 = nn.Conv2d(

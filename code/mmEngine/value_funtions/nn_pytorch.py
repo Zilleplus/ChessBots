@@ -1,6 +1,4 @@
-from pathlib import Path
 import time
-from typing import Optional
 from chess import Board
 import torch
 import torch.nn as nn
@@ -10,19 +8,18 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 import numpy as np
 import wandb
 from mmEngine.database import convert
-from mmEngine.models import load_model, save_model
-from mmEngine.models.big_cnn import BigCNN
-from mmEngine.models.store import model_store
+from mmEngine.models import save_model
 from mmEngine.value_funtions.value_function import ValueFunction
+
 
 def encode_board(board_positions: torch.Tensor) -> torch.Tensor:
     """
     Encode the board positions into a tensor that can be fed into the model.
-    
+
     args:
         board_positions: a tensor of shape (number_of_samples, 8, 8)
     returns:
-        a tensor of shape (number_of_samples, 8, 8, 13)
+        a tensor of shape (number_of_samples, 8, 8, 12)
     """
     assert board_positions.shape[1] == 8
     assert board_positions.shape[2] == 8
@@ -34,14 +31,15 @@ def encode_board(board_positions: torch.Tensor) -> torch.Tensor:
     # (sample, channel, width, height)
     board_positions = torch.transpose(board_positions, 3, 2)
     board_positions = torch.transpose(board_positions, 2, 1)
-    board_positions = board_positions.float()
 
-    return board_positions
+    return board_positions[:, 1:, :, :]
 
 
 def TrainPytorchModel(
     numpy_dataset: list[np.ndarray],
     model: nn.Module,
+    model_val_loss: float = float("inf"),
+    early_stopping: bool = False,
     disable_save=False,
     disable_wandb=False,
 ):
@@ -51,6 +49,9 @@ def TrainPytorchModel(
     args:
         numpy_dataset: a list of numpy arrays containing the dataset.
         model: the model to train.
+        model_val_loss: the validation loss of the model.
+        early_stopping: if true, stop training if the validation loss doesn't
+            improve.
         disable_save: if true, don't save the model.
         disable_wandb: if true, don't log to wandb.
 
@@ -77,7 +78,7 @@ def TrainPytorchModel(
     if not disable_wandb:
         wandb.init(project="chess_pytorch")
         wandb.watch(model, log_freq=100)
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
     loss_function = nn.MSELoss()
 
@@ -88,12 +89,13 @@ def TrainPytorchModel(
         start = time.time()
         for i, sample in enumerate(DataLoader(train_set, batch_size=batch_size)):
             board_positions, win_rate = sample
-            board_positions = encode_board(board_positions.cuda())
-            win_rate = torch.reshape(win_rate.cuda() ,(win_rate.shape[0], 1))
+            board_positions = board_positions.cuda()
+            win_rate = win_rate.cuda()
+            board_positions = encode_board(board_positions).float()
 
             optimizer.zero_grad()
 
-            outputs = model(board_positions)
+            outputs = torch.squeeze(model(board_positions))
             loss = loss_function(outputs, win_rate)
 
             loss.backward()
@@ -122,8 +124,11 @@ def TrainPytorchModel(
         with torch.no_grad():
             for i, sample in enumerate(DataLoader(val_set, batch_size)):
                 X, y = sample
-                Y = torch.reshape(Y ,(Y.shape[0], 1))
-                pred = model(encode_board(X))
+                X = X.cuda()
+                y = y.cuda()
+
+                pred = model(encode_board(X).float())
+                pred = torch.squeeze(pred)
                 loss = loss_function(pred, y)
                 val_loss += loss.item()
 
@@ -132,25 +137,39 @@ def TrainPytorchModel(
             wandb.log({"loss": running_loss})
             wandb.log({"val_loss": val_loss})
 
-        
-        model_path, save_sucess = save_model(
-            model=model,
-            loss=running_loss,
-            optimizer=optimizer,
-        )
-        if save_sucess:
-            print(f"-> saved model to {model_path}.")
+        if disable_save:
+            print("-> not saving model because disable_save is true.")
         else:
-            print(f"-> failed to save model to {model_path}.")
+            if val_loss < model_val_loss or not early_stopping:
+                model_path, save_success = save_model(
+                    model=model,
+                    loss=running_loss,
+                    optimizer=optimizer,
+                    val_loss=val_loss,
+                )
+                model_val_loss = val_loss
+                if save_success:
+                    print(f"-> saved model to {model_path}.")
+                else:
+                    print(f"-> failed to save model to {model_path}.")
+            else:
+                print(
+                    f"-> not saving model because val_loss({val_loss}) is not lower the the previous run ({model_val_loss})."
+                )
+                print(f"-> stopping training.")
+                break
 
     model.eval()
     test_loss: float = 0.0
     for i, sample in enumerate(DataLoader(test_set, batch_size=batch_size)):
         board_positions, win_rate = sample
-        board_positions = encode_board(board_positions)
+        board_positions = board_positions.cuda()
+        win_rate = win_rate.cuda()
+        board_positions = encode_board(board_positions).float()
 
         outputs = model(board_positions)
-        loss = loss_function(outputs, win_rate)
+        pred = torch.squeeze(outputs)
+        loss = loss_function(pred, y)
 
         test_loss += loss
 
@@ -166,9 +185,9 @@ class NNPytorchValueFunction(ValueFunction):
 
     def __call__(self, board: Board) -> float:
         np_board: np.ndarray = convert(board)
-        X = torch.from_numpy(np_board).float() # shape=(64,)
-        X = torch.reshape(X, (1, 8, 8)) # shape=(8, 8)
-        X = encode_board(X) # shape=(13, 8, 8)
+        X = torch.from_numpy(np_board).float()  # shape=(64,)
+        X = torch.reshape(X, (1, 8, 8))  # shape=(8, 8)
+        X = encode_board(X)  # shape=(12, 8, 8)
         pred = self.model(X)
 
         if board.turn:

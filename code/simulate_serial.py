@@ -3,7 +3,7 @@ import chess
 from mmEngine.agents import Agent, RandomAgent, MinMaxAgent
 from mmEngine.agents.minMaxAlphaBetaSearch import MinMaxAlphaBetaAgent
 from mmEngine.value_funtions import MaterialCount
-from mmEngine.value_funtions.nn_pytorch import NNPytorchValueFunction, load_model
+from mmEngine.value_funtions.nn_pytorch import NNPytorchValueFunction
 from mmEngine.models import load_model, model_store
 from dataclasses import dataclass
 from pathlib import Path
