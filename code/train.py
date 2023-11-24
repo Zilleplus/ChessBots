@@ -29,7 +29,7 @@ def main_pytorch():
     else:
         print(f"Created new model, no model found at {model_path} \n")
 
-    TrainPytorchModel(data, model=model.cuda())
+    TrainPytorchModel(data[0]["X"], data[0]["Y"], model=model.cuda())
 
 
 if __name__ == "__main__":

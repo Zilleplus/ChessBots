@@ -13,7 +13,10 @@ num_classes = x.max() + 1
 # The values tensor contains the non-zero values in x (which are all 1 in this case)
 indices = x.unsqueeze(-1)
 values = torch.ones_like(indices, dtype=torch.float)
-one_hot = torch.FloatTensor(indices=indices, values=values, size=(x.size(0), x.size(1), num_classes))
+
+# The type hinting indicates that no overload matches the arguments
+# Not sure what's going on here, hmm.
+# one_hot = torch.FloatTensor(indices=indices, values=values, size=(x.size(0), x.size(1), num_classes))
 
 # Convert the sparse tensor to a dense tensor
 # dense_one_hot = one_hot.to_dense()

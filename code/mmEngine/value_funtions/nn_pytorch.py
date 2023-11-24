@@ -11,6 +11,79 @@ from mmEngine.database import convert
 from mmEngine.models import save_model
 from mmEngine.value_funtions.value_function import ValueFunction
 
+class DataCache:
+    def __init__(self, data: list[np.ndarray]):
+        self.data = data
+        self.counts = [data["X"].shape[0] for data in self.data]
+        self.cumulative_counts = np.cumsum(self.counts)
+
+    def len(self) -> int:
+        return sum([data["X"].shape[0] for data in self.data])
+
+    def isInCache(self, index: int) -> bool:
+        return index < self.len()
+
+    def absoluteToRelativeIndex(self, index: int) -> tuple[int, int]:
+        """
+        Convert an absolute index to a relative index.
+
+        args:
+            index: the absolute index.
+        returns:
+            the relative index and the index of the data array.
+        """
+        assert index < self.len()
+        
+        in_range = np.where(self.cumulative_counts > index)[0]
+        if len(in_range) == 0:
+            raise ValueError("Index out of range")
+        else:
+            data_set_index = in_range[0]
+            if data_set_index == 0:
+                return index, data_set_index
+            else:
+                return index - self.cumulative_counts[data_set_index - 1], data_set_index
+
+    def get(self, index: int) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Get the data at the given index.
+
+        args:
+            index: the absolute index.
+        returns:
+            the data at the given index.
+        """
+        relative_index, data_set_index = self.absoluteToRelativeIndex(index)
+        return self.data[data_set_index]["X"][relative_index], self.data[data_set_index]["Y"][relative_index]
+    
+    def getSlice(self, indices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Get the data at the given indices.
+
+        args:
+            indices: the absolute indices.
+        returns:
+            the data at the given indices.
+        """
+        X = np.zeros((len(indices), 8, 8), dtype=np.float32)
+        y = np.zeros((len(indices), 1), dtype=np.float32)
+        index: int
+        for (i, index) in enumerate(indices):
+            X[i], y[i] = self.get(index)
+
+        return X, y
+            
+    def getRandomSlice(self, count: int):
+        """
+        Get a random slice of the data.
+
+        args:
+            count: the number of samples to get.
+        returns:
+            the data at the given indices.
+        """
+        indices = np.random.randint(0, self.len(), count)
+        return self.getSlice(indices)    
 
 def encode_board(board_positions: torch.Tensor) -> torch.Tensor:
     """
@@ -36,7 +109,8 @@ def encode_board(board_positions: torch.Tensor) -> torch.Tensor:
 
 
 def TrainPytorchModel(
-    numpy_dataset: list[np.ndarray],
+    X_input: np.ndarray,
+    y_input: np.ndarray,
     model: nn.Module,
     model_val_loss: float = float("inf"),
     early_stopping: bool = False,
@@ -58,14 +132,18 @@ def TrainPytorchModel(
     returns:
         The trained model.
     """
-    assert len(numpy_dataset) > 0
+    # assert len(numpy_dataset) > 0
+
+    # number_of_samples: int = sum([data["X"].shape[0] for data in numpy_dataset])
+    # print(f"Number of samples: {number_of_samples}")
+
     batch_size: int = 20000
 
-    X = torch.from_numpy(numpy_dataset[0]["X"]).float()
-    Y = torch.from_numpy(numpy_dataset[0]["Y"]).float().cuda()  # y
+    X = torch.from_numpy(X_input).float()
+    Y = torch.from_numpy(y_input).float().cuda()  # y
 
     # remove numpy_dataset from memory
-    del numpy_dataset
+    #del numpy_dataset
 
     # reshape to (sample, width of board, height of board)
     X = torch.reshape(X, (X.shape[0], 8, 8))
